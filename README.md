@@ -54,19 +54,35 @@ Works with all OpenAI'ish API: [llama.cpp](https://github.com/ggerganov/llama.cp
 
 ## Usage
 
-### AI Assistance use case
+### Interacting with the AI
 
-ChatGPT mode works the following way:
+You can interact with the AI in several ways, primarily through commands available in the Sublime Text Command Palette:
 
-0. Select some text or even the whole tabs to include them in request
-1. Run either `OpenAI: Chat Model Select` or `OpenAI: Chat Model Select With Tabs` commands.
-2. Input a request in input window if any.
-3. The model will print a response in output panel by default, but you can switch that to a separate tab with `OpenAI: Open in Tab`.
-4. To get an existing chat in a new window run `OpenAI: Refresh Chat`.
-5. To reset history `OpenAI: Reset Chat History` command to rescue.
+1.  **Select Text (Optional):** You can select a region of text in your current file to be included as part of the context for your prompt.
+2.  **Choose Your Command:**
+    *   **`OpenAI: Chat Model Select`**: This is the most flexible command. It opens a panel allowing you to:
+        *   Choose a specific "assistant" (which defines the model, API key, temperature, etc.).
+        *   Select an "output_mode" (inline `Phantom` or a chat `View` in a panel/new tab).
+        This command automatically includes any files you've marked for context (see "Additional Request Context Management" below).
+    *   **`OpenAI: New Message`**: This command sends your input directly using the assistant and output mode that were last selected or are currently active. It's quicker if you're consistently using the same settings. This command also includes any files marked for context.
+3.  **Input Your Prompt:** An input panel will appear, allowing you to type your question or instruction for the AI.
+4.  **View Response:**
+    *   The AI's response will typically appear in the OpenAI output panel.
+    *   If you chose "Phantom" mode (with `OpenAI: Chat Model Select`), the response will appear as an inline overlay.
+    *   You can switch to a dedicated tab for the chat using the `OpenAI: Open in Tab` command.
 
-> [!NOTE]
->  You suggested to bind at least `OpenAI: New Message`, `OpenAI: Chat Model Select` and `OpenAI: Show output panel` in sake for convenience, you can do that in plugin settings.
+**Including Build/LSP Output:**
+For more specific contexts, especially when coding, you can use commands that automatically include output from Sublime Text's diagnostic panels:
+*   `OpenAI: New Message With Build Output`
+*   `OpenAI: Chat Model Select With Build Output`
+*   `OpenAI: New Message With LSP Output`
+*   `OpenAI: Chat Model Select With LSP Output`
+
+These commands will append recent lines from the respective output panels (Build results or LSP diagnostics) to your request. The number of lines included can be configured with the `build_output_limit` setting in `openAI.sublime-settings`. This is useful for asking the AI to explain errors, debug code, or summarize diagnostics.
+
+**Managing Chat Sessions:**
+*   **`OpenAI: Refresh Chat`**: Reloads the chat history into the output panel or tab.
+*   **`OpenAI: Reset Chat History`**: Clears the chat history for the current context (project-specific or global).
 
 ### Chat history management
 
@@ -82,20 +98,23 @@ You can separate a chat history and assistant settings for a given project by ap
 }
 ```
 
-### Additional request context management
+### Additional Request Context Management
 
-You can add a few things to your request:
-- multi-line selection within a single file
-- multiple files within a single View Group
+You can include the content of specific files as context for the AI. Files marked for context will have their content sent along with your prompt. There are several ways to manage this:
 
-To perform the former just select something within an active view and initiate the request this way without switching to another tab, selection would be added to a request as a preceding message (each selection chunk would be split by a new line).
+*   **Using the Command Palette:**
+    *   Run the `OpenAI: Add Sheets to Context` command. If you run this while one or more tabs are selected (e.g., using `Ctrl+Click` or `Cmd+Click` on tabs, or by selecting files in the sidebar that get focused as tabs), it will toggle their inclusion in the AI context.
+*   **Using the Tab Context Menu:**
+    *   Right-click on an open tab and select `OpenAI: Add File to Context` from the context menu to toggle its inclusion.
+*   **Using the Sidebar Context Menu:**
+    *   Right-click on a file or a selection of files in the sidebar and choose `OpenAI: Add File to Context` from the context menu to toggle their inclusion.
 
-To append the whole file(s) to request you should `super+button1` on them to make whole tabs of them to become visible in a **single view group** and then run `OpenAI: Add Sheets to Context` command. Sheets can be deselected with the same command.
+Once files are added to the context:
+*   You can see the number of currently included sheets in the status bar (if this option is enabled in the `status_hint` setting).
+*   The `OpenAI: Chat Model Select` command preview panel will also list the files currently included.
+*   To view all files currently marked for context in the current window, run the `OpenAI: Show All Selected Sheets` command from the Command Palette. This will select these files in their respective views/groups.
 
-You can check the numbers of added sheets in the status bar and on `"OpenAI: Chat Model Select"` command call in the preview section. 
-
-![](static/media/ai_selector_preview.png)
-
+Files can be deselected using the same methods (the commands effectively toggle the inclusion status).
 
 ### Image handling
 
@@ -114,7 +133,13 @@ Phantom is the overlay UI placed inline in the editor view (see the picture belo
 
 1. [optional] Select some text to pass in context in to manipulate with.
 2. Pick `Phantom` as an output mode in quick panel `OpenAI: Chat Model Select`.
-3. You can apply actions to the llm prompt, they're quite self descriptive and follows behavior deprecated in buffer commands.
+3. After the AI responds, the phantom will display actions like:
+    *   **[x] (Close):** Dismisses the phantom.
+    *   **Copy:** Copies the AI's response (or just the code, if `phantom_integrate_code_only` is true) to the clipboard.
+    *   **Append:** Appends the AI's response to the end of your current selection in the editor (or at the cursor position if no selection).
+    *   **Replace:** Replaces your current selection with the AI's response.
+    *   **In New Tab:** Opens the AI's full response in a new tab.
+    *   **Add to History:** Saves the current interaction (your prompt and the AI's response) to the chat history panel/view.
 4. You can hit `ctrl+c` to stop prompting same as with in `panel` mode.
 
 ![](static/media/phantom_actions.png)
@@ -140,7 +165,7 @@ You can read more [about OpenAI compatibility in the Gemini documentation](https
 
 ## Settings
 
-The OpenAI Completion plugin has a settings file where you can set your OpenAI API key. This is required for the most of providers to work. To set your API key, open the settings with the `Preferences: OpenAI Settings` command and paste your API key in the token property, as follows:
+The OpenAI Completion plugin has a settings file where youcan set your OpenAI API key. This is required for the most of providers to work. To set your API key, open the settings with the `Preferences: OpenAI Settings` command and paste your API key in the token property, as follows: You can also access these settings and the default keybindings via the main menu: `Preferences -> Package Settings -> OpenAI completion`.
 
 ```json
 {
@@ -152,16 +177,52 @@ The OpenAI Completion plugin has a settings file where you can set your OpenAI A
 
 To disable advertisement you have to add `"advertisement": false` line into an assistant setting where you wish it to be disabled.
 
-## Key bindings
+## Key Bindings
 
-You can bind keys for a given plugin command in `Preferences: OpenAI Key Bindings`. For example you can bind "New Message" including active tabs as context command like this:
+You can create custom keybindings for OpenAI commands by adding entries to your user keymap file. Access this file via the Command Palette (`Preferences: Key Bindings`) or the main menu (`Preferences -> Key Bindings`). Sublime Text keybindings often use sequences, for example, pressing `super+k` (or `ctrl+k` on Windows/Linux) followed by another key.
 
-```js
+Here are some examples to get you started:
+
+**1. New Message with current assistant (includes files marked for context):**
+```json
 {
-    "keys": [ "super+k", "super+'" ],
-    "command": "openai", // or "openai_panel"
-    "args": { "files_included": true }
-},
+    "keys": ["super+k", "m"], // macOS: Cmd+k, then m
+    "command": "openai"
+}
+```
+
+**2. Open Chat Model Select panel (includes files marked for context):**
+```json
+{
+    "keys": ["super+k", "super+m"], // macOS: Cmd+k, then Cmd+m
+    "command": "openai_panel"
+}
+```
+
+**3. New Message with Build Output (using current assistant):**
+```json
+{
+    "keys": ["super+k", "b"], // macOS: Cmd+k, then b
+    "command": "openai",
+    "args": { "build_output": true }
+}
+```
+
+**4. Toggle current file's inclusion in AI Context (matches "OpenAI: Add Sheets to Context" command):**
+```json
+{
+    "keys": ["super+k", "c"], // macOS: Cmd+k, then c
+    "command": "toggle_view_ai_context_included"
+}
+```
+
+**5. Show the AI Chat output panel:**
+```json
+{
+    "keys": ["super+k", "p"], // macOS: Cmd+k, then p
+    "command": "show_panel",
+    "args": { "panel": "output.AI Chat" }
+}
 ```
 
 ### Proxy support
