@@ -120,6 +120,63 @@ def _parse_model_patch(diff: str) -> List[Tuple[str, str]]:
     return hunks
 
 
+# ---------------------------------------------------------------------------
+# Unified diff parser – handles patches that include @@ headers and context
+# lines (" ", "-", "+") produced by tools like git or AI models.
+# ---------------------------------------------------------------------------
+
+
+def _parse_unified_patch(diff: str) -> List[Tuple[str, str]]:
+    """Convert a minimal unified diff to (old_block, new_block) pairs.
+
+    We skip headers (---/+++) and collect changes inside each @@ hunk. Context
+    lines (prefix ' ') are added to both old and new blocks; removals ('-') go
+    only to the *old* block; additions ('+') go only to the *new* block.
+    """
+
+    old_block: List[str] = []
+    new_block: List[str] = []
+    hunks: List[Tuple[str, str]] = []
+    in_hunk = False
+
+    def _flush():
+        nonlocal old_block, new_block
+        if old_block or new_block:
+            hunks.append(('\n'.join(old_block) + '\n', '\n'.join(new_block) + '\n'))
+            old_block = []
+            new_block = []
+
+    for line in diff.splitlines():
+        if line.startswith('@@'):
+            _flush()
+            in_hunk = True
+            continue
+
+        if not in_hunk:
+            # skip headers or junk outside hunks
+            continue
+
+        if line.startswith(' '):
+            txt = line[1:]
+            old_block.append(txt)
+            new_block.append(txt)
+        elif line.startswith('-') and not line.startswith('---'):
+            old_block.append(line[1:])
+        elif line.startswith('+') and not line.startswith('+++'):
+            new_block.append(line[1:])
+        else:
+            # Unknown line => terminate current hunk context
+            in_hunk = False
+            _flush()
+
+    _flush()
+
+    if not hunks:
+        raise ValueError('No hunks found in unified diff')
+
+    return hunks
+
+
 def _apply_hunks_sequentially(original: str, hunks: List[Tuple[str, str]]) -> str:
     """
     Apply hunks **in order**; match each old-block by ignoring leading whitespace.
@@ -248,32 +305,46 @@ class FunctionHandler:
                 strict_err: Exception | None = None
 
                 try:
+                    # 1) Try strict minimal diff parser first
                     hunks = _parse_model_patch(normalized_diff)
                     new_content = _apply_hunks_sequentially(original, hunks)
                 except Exception as e:
                     strict_err = e
 
+                    # 2) Fallback: unified diff (handles @@ headers)
+                    try:
+                        hunks = _parse_unified_patch(normalized_diff)
+                        new_content = _apply_hunks_sequentially(original, hunks)
+                        strict_err = None  # treat as success for shortcut logic below
+                    except Exception:
+                        pass
+
                 # Already-applied shortcut
                 if strict_err:
                     try:
                         simple_hunks = _parse_simple_patch(normalized_diff)
-                        applied_all = True
-                        for old_hunk, new_hunk in simple_hunks:
-                            old_str = old_hunk.strip('\n')
-                            new_str = new_hunk.strip('\n')
 
-                            if not new_str:
-                                continue  # pure deletion, ignore
+                        # If no hunks were detected, we cannot make any claims about the
+                        # patch being already applied – fall back to normal processing.
+                        if simple_hunks:
+                            applied_all = True
 
-                            # New part is present and old part is gone?
-                            if new_str in original and (not old_str or old_str not in original):
-                                continue
+                            for old_hunk, new_hunk in simple_hunks:
+                                old_str = old_hunk.strip('\n')
+                                new_str = new_hunk.strip('\n')
 
-                            applied_all = False
-                            break
+                                if not new_str:
+                                    continue  # pure deletion, ignore
 
-                        if applied_all:
-                            continue  # block already applied, skip write
+                                # New part is present and old part is gone?
+                                if new_str in original and (not old_str or old_str not in original):
+                                    continue
+
+                                applied_all = False
+                                break
+
+                            if applied_all:
+                                continue  # block already applied, skip write
                     except Exception:
                         pass
 
@@ -389,81 +460,52 @@ class FunctionHandler:
             )
 
         elif func_name == Function.get_working_directory_content.value:
-            path = args_json.get('directory_path')
-            logger.debug('initial directory_path: %s', path)
-
-            # 1. establish project root (first folder or cwd)
+            directory_path = args_json.get('directory_path')
             folders = window.folders()
             project_root = folders[0] if folders else os.getcwd()
+            # resolve target directory
+            if not directory_path or directory_path in ('.', './'):
+                base = project_root
+            elif os.path.isabs(directory_path):
+                base = directory_path
+            else:
+                base = os.path.join(project_root, directory_path)
+            if not isinstance(base, str):
+                return f'Wrong attributes passed: directory_path={directory_path}'
+            if not os.path.isdir(base):
+                return f'Directory not found: {base}'
 
-            # 2. resolve the directory_path argument
-            if not path or path in ('.', './'):
-                path = project_root
-            elif not os.path.isabs(path):
-                # treat as relative to project root
-                path = os.path.join(project_root, path)
-
-            if not isinstance(path, str):
-                return f'Wrong attributes passed: directory_path={path}'
-
-            if not os.path.exists(path):
-                return f'Directory not found: {path}'
-
-            # Recursively list like `ls -R`, respecting .gitignore
-            output_lines: List[str] = []
-            # Top-level directory: use "." as ls -R does
-            items = os.listdir(path)
-            if '.git' in items:
-                items.remove('.git')
-            ignored = get_ignored_files(items, path)
-            visible = sorted([i for i in items if i not in ignored])
-            output_lines.append('.:')
-            if visible:
-                output_lines.append(' '.join(visible))
-            output_lines.append('')
-
-            # Recurse into subdirectories
-            for root, dirs, files in os.walk(path):
-                # always skip `.git` directory from traversal
+            files_list: List[str] = []
+            for root, dirs, files in os.walk(base):
+                # always skip .git
                 if '.git' in dirs:
                     dirs.remove('.git')
-                rel = os.path.relpath(root, path)
-                if rel == '.':
-                    continue
 
-                # filter ignored entries
-                rel_paths = [os.path.relpath(os.path.join(root, name), path) for name in dirs + files]
-                ignored = get_ignored_files(rel_paths, path)
+                # determine ignored items
+                rel_items = [
+                    os.path.relpath(os.path.join(root, name), project_root)
+                    for name in dirs + files
+                ]
+                ignored = get_ignored_files(rel_items, project_root)
 
-                entries: List[str] = []
-                for name in sorted(dirs):
-                    relp = os.path.relpath(os.path.join(root, name), path)
-                    if relp in ignored:
+                # prune ignored dirs
+                dirs[:] = [
+                    d for d in dirs
+                    if os.path.relpath(os.path.join(root, d), project_root) not in ignored
+                ]
+
+                # collect non-ignored files
+                for f in sorted(files):
+                    rel = os.path.relpath(os.path.join(root, f), project_root)
+                    if rel in ignored:
                         continue
-                    entries.append(name)
-                for name in sorted(files):
-                    relp = os.path.relpath(os.path.join(root, name), path)
-                    if relp in ignored:
-                        continue
-                    entries.append(name)
+                    files_list.append(rel)
 
-                output_lines.append(f'./{rel}:')
-                if entries:
-                    output_lines.append(' '.join(entries))
-                output_lines.append('')
-
-            content_text = '\n'.join(output_lines).rstrip('\n')
-            # apply same 5k char limit
-            return dumps(
-                {
-                    'content': content_text[:5000]
-                    + (
-                        f'…[truncated] response is too long: {len(content_text)}'
-                        if len(content_text) > 5000
-                        else ''
-                    )
-                }
-            )
+            content = '\n'.join(files_list)
+            length = len(content)
+            if length > 2000:
+                content = content[:2000] + f'…[truncated] response is too long: {length}'
+            return dumps({'content': content})
         else:
             return f"Called function doen't exists: {func_name}"
 
