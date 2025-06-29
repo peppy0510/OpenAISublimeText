@@ -50,9 +50,14 @@ class Openai(TextCommand):
 
     @classmethod
     def create_new_tab(cls, listener: SharedOutputPanelListener):
+        # Check if the window exist. If not, it creates the window
         window = active_window()
-        listener.create_new_tab(window)
-        listener.refresh_output_panel(window=window)
+        if listener.get_active_tab_(window):
+            window.focus_view(listener.get_active_tab_(window))
+            listener.refresh_output_panel(window=window)
+        else:
+            listener.create_new_tab(window)
+            listener.refresh_output_panel(window=window)
 
     @classmethod
     def refresh_output_panel(cls, listener: SharedOutputPanelListener):
