@@ -120,7 +120,6 @@ class SharedOutputPanelListener(EventListener):
         view = self.get_active_tab_(window) or None
         if view:
             view.set_name(self.OUTPUT_PANEL_NAME)
-            window.focus_view(view)
             return
         window.run_command('show_panel', {'panel': f'output.{self.OUTPUT_PANEL_NAME}'})
 
