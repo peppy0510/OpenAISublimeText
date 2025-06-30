@@ -29,9 +29,8 @@ class SharedOutputPanelListener(EventListener):
 
     def create_new_tab(self, window: Window):
         if self.get_active_tab_(window=window):
-            self.refresh_output_panel(window=window)
             window.focus_view(window=window)
-            self.show_panel(window=window)
+            self.refresh_output_panel(window=window)
             return
 
         new_view = window.new_file()
@@ -121,10 +120,15 @@ class SharedOutputPanelListener(EventListener):
         view = self.get_active_tab_(window) or None
         if view:
             view.set_name(self.OUTPUT_PANEL_NAME)
+            window.focus_view(view)
             return
-
         window.run_command('show_panel', {'panel': f'output.{self.OUTPUT_PANEL_NAME}'})
 
+    def go_to_panel(self, window: Window):
+        view = self.get_active_tab_(window) or None
+        if view:
+            window.focus_view(view)
+            return
 
 def __get_number_of_lines__(view: View) -> int:
     last_line_num = view.rowcol(view.size())[0]
