@@ -51,7 +51,8 @@ class Openai(TextCommand):
     @classmethod
     def create_new_tab(cls, listener: SharedOutputPanelListener):
         # Everything happens in output_panel.py
-        listener.handle_create_new_tab()
+        window = active_window()
+        listener.open_tab(window)   
 
     @classmethod
     def refresh_output_panel(cls, listener: SharedOutputPanelListener):

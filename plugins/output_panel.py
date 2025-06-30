@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict
 
 from llm_runner import Roles, read_all_cache  # type: ignore
-from sublime import Settings, View, Window, load_settings, active_window
+from sublime import Settings, View, Window, load_settings
 from sublime_plugin import EventListener
 
 from .load_model import get_cache_path
@@ -27,23 +27,26 @@ class SharedOutputPanelListener(EventListener):
         self.reverse_for_tab: bool = self.panel_settings.get('reverse_for_tab', True)
         super().__init__()
 
-    def handle_create_new_tab(self, window: Window):
-        window = active_window()
-        
+    def create_new_tab(self, window: Window):
         if self.get_active_tab_(window=window):
             self.refresh_output_panel(window=window)
             self.show_panel(window=window)
+
+        new_view = window.new_file()
+        new_view.set_scratch(True)
+        self.setup_common_presentation_style_(new_view, reversed=self.reverse_for_tab)
+        ## FIXME: This is temporary, should be moved to plugin settings
+        new_view.set_name(self.OUTPUT_PANEL_NAME)
+        new_view.settings().set('sheet_view', self.OUTPUT_PANEL_NAME)
+
+    def open_tab(self, window:Window):
+        # Check if the window exist. If not, it creates the window
+        if self.get_active_tab_(window):
             window.focus_view(self.get_active_tab_(window))
-        else:
-            new_view = window.new_file()
-            new_view.set_scratch(True)
-            self.setup_common_presentation_style_(new_view, reversed=self.reverse_for_tab)
-
-            ## FIXME: This is temporary, should be moved to plugin settings
-            new_view.set_name(self.OUTPUT_PANEL_NAME)
-            new_view.settings().set('sheet_view', self.OUTPUT_PANEL_NAME)
             self.refresh_output_panel(window=window)
-
+        else:
+            self.create_new_tab(window)
+            self.refresh_output_panel(window=window)
 
     def get_output_panel_(self, window: Window) -> View:
         output_panel = window.find_output_panel(self.OUTPUT_PANEL_NAME) or window.create_output_panel(
