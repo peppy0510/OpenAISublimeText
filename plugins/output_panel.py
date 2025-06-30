@@ -30,6 +30,7 @@ class SharedOutputPanelListener(EventListener):
     def create_new_tab(self, window: Window):
         if self.get_active_tab_(window=window):
             self.refresh_output_panel(window=window)
+            window.focus_view(window=window)
             self.show_panel(window=window)
             return
 
@@ -39,7 +40,6 @@ class SharedOutputPanelListener(EventListener):
         ## FIXME: This is temporary, should be moved to plugin settings
         new_view.set_name(self.OUTPUT_PANEL_NAME)
         new_view.settings().set('sheet_view', self.OUTPUT_PANEL_NAME)
-
 
     def get_output_panel_(self, window: Window) -> View:
         output_panel = window.find_output_panel(self.OUTPUT_PANEL_NAME) or window.create_output_panel(
@@ -121,7 +121,6 @@ class SharedOutputPanelListener(EventListener):
         view = self.get_active_tab_(window) or None
         if view:
             view.set_name(self.OUTPUT_PANEL_NAME)
-            window.focus_view(view)
             return
 
         window.run_command('show_panel', {'panel': f'output.{self.OUTPUT_PANEL_NAME}'})
