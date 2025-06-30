@@ -30,8 +30,9 @@ class SharedOutputPanelListener(EventListener):
     def create_new_tab(self, window: Window):
         if self.get_active_tab_(window=window):
             window.focus_view(self.get_active_tab_(window=window))
+            self.show_panel(window=window)
             self.refresh_output_panel(window=window)
-            return
+            return 
 
         new_view = window.new_file()
         new_view.set_scratch(True)
