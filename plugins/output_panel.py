@@ -31,6 +31,7 @@ class SharedOutputPanelListener(EventListener):
         if self.get_active_tab_(window=window):
             self.refresh_output_panel(window=window)
             self.show_panel(window=window)
+            return
 
         new_view = window.new_file()
         new_view.set_scratch(True)
@@ -39,14 +40,6 @@ class SharedOutputPanelListener(EventListener):
         new_view.set_name(self.OUTPUT_PANEL_NAME)
         new_view.settings().set('sheet_view', self.OUTPUT_PANEL_NAME)
 
-    def open_tab(self, window:Window):
-        # Check if the window exist. If not, it creates the window
-        if self.get_active_tab_(window):
-            window.focus_view(self.get_active_tab_(window))
-            self.refresh_output_panel(window=window)
-        else:
-            self.create_new_tab(window)
-            self.refresh_output_panel(window=window)
 
     def get_output_panel_(self, window: Window) -> View:
         output_panel = window.find_output_panel(self.OUTPUT_PANEL_NAME) or window.create_output_panel(
@@ -128,6 +121,7 @@ class SharedOutputPanelListener(EventListener):
         view = self.get_active_tab_(window) or None
         if view:
             view.set_name(self.OUTPUT_PANEL_NAME)
+            window.focus_view(view)
             return
 
         window.run_command('show_panel', {'panel': f'output.{self.OUTPUT_PANEL_NAME}'})
