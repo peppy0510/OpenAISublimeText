@@ -122,6 +122,7 @@ class SharedOutputPanelListener(EventListener):
         if view:
             view.set_name(self.OUTPUT_PANEL_NAME)
             return
+        
         window.run_command('show_panel', {'panel': f'output.{self.OUTPUT_PANEL_NAME}'})
 
 
