@@ -10,11 +10,19 @@ Works with all OpenAI'ish API: [llama.cpp](https://github.com/ggerganov/llama.cp
 
 ![](static/media/ai_chat_left_full.png)
 
+> [!NOTE]
+> This plugin is in its pretty much finite state as it is, with persistent dialog storage and Phantoms support. So
+> - No more connector will added here (Antropic, Gemini, etc)
+> - No more tools support will be added also.
+> - Same as no MCP server support will be provided as well.[^1]
+> 
+> The good news is that all of those available out of the box in my next [CodexSublime](https://github.com/yaroslavyaroslav/CodexSublime) plugin which leverages all these thing on [openai/codex](https://github.com/openai/codex) obviously. Check it out.
+
+
 ## Features
 
 - **Chat mode** powered by whatever model you'd like.
-- **o4-mini** and **o3** support.
-- **gpt-4.1** support
+- **gpt-5** support.
 - **[llama.cpp](https://github.com/ggerganov/llama.cpp)**'s server, **[ollama](https://ollama.com)** and all the rest OpenAI'ish API compatible.
 - **Dedicated chats histories** and assistant settings for a projects.
 - **Ability to send whole files** or their parts as a context expanding.
@@ -245,6 +253,8 @@ You can setup it up by overriding the proxy property in the `OpenAI completion` 
 
 > [!NOTE]
 > Dedicated to GPT3.5 that one the one who initially written at 80% of this back then. This was felt like a pure magic!
+
+[^1]: PR's are welcome tho.
 
 [stars]: https://github.com/yaroslavyaroslav/OpenAI-sublime-text/stargazers
 [img-stars]: static/media/star-on-github.svg
